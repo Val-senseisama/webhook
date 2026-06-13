@@ -1,0 +1,32 @@
+# Supabase project config — generated for webhook system
+# Docs: https://supabase.com/docs/guides/cli/config
+
+project_id = "webhook"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = false
+
+[storage]
+enabled = false
+
+[auth]
+enabled = false   # Using custom API key auth, not Supabase Auth
+
+[realtime]
+enabled = true    # Used by Next.js dashboard for live delivery updates

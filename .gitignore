@@ -1,0 +1,16 @@
+.env
+*.env.local
+
+# Go
+api/bin/
+bin/
+
+# Node
+dashboard/node_modules/
+dashboard/.next/
+
+# Supabase local dev (not needed — we use hosted)
+supabase/.branches/
+supabase/.temp/
+api/api
+api/migrations/

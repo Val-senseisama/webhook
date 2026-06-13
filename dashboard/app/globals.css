@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+
+  --color-bg:            #080808;
+  --color-surface:       #0f0f0f;
+  --color-surface-hi:    #141414;
+  --color-border:        #1e1e1e;
+  --color-border-hi:     #2a2a2a;
+  --color-text:          #e8e8e8;
+  --color-muted:         #505050;
+  --color-dim:           #282828;
+  --color-accent:        #f97316;
+  --color-accent-dim:    rgba(249,115,22,0.12);
+  --color-success:       #22c55e;
+  --color-warning:       #eab308;
+  --color-error:         #ef4444;
+  --color-info:          #60a5fa;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-mono);
+  background: var(--color-bg);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum" 1;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: flex;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--color-bg); }
+::-webkit-scrollbar-thumb { background: var(--color-border-hi); }
+
+::selection { background: var(--color-accent-dim); color: var(--color-accent); }
+
+/* Status dot animations */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+.pulse { animation: pulse 2s ease-in-out infinite; }
+
+/* Table row hover */
+tr.row-hover:hover td { background: var(--color-surface-hi); }
