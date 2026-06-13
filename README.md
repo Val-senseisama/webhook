@@ -2,6 +2,8 @@
 
 A production-grade webhook delivery platform built from scratch. Events are ingested, fanned out to subscribed endpoints, delivered with HMAC-signed payloads, and retried with exponential backoff — all backed by a Postgres job queue with no external message broker.
 
+**Live dashboard:** [webhook.zevbii.com](https://webhook.zevbii.com)
+
 **Stack:** Go · Supabase (Postgres) · River · Next.js 15
 
 ---
