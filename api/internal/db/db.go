@@ -36,7 +36,7 @@ type Endpoint struct {
 	TenantID   uuid.UUID `json:"tenant_id"`
 	Name       string    `json:"name"`
 	URL        string    `json:"url"`
-	Secret     string    `json:"secret"`
+	Secret     string    `json:"-"` // never serialised; shown once at creation via explicit response type
 	Enabled    bool      `json:"enabled"`
 	TimeoutMs  int       `json:"timeout_ms"`
 	MaxRetries int       `json:"max_retries"`
