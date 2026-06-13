@@ -50,12 +50,13 @@ func (h *EventsHandler) list(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *EventsHandler) get(w http.ResponseWriter, r *http.Request) {
+	tenantID := middleware.TenantFromContext(r.Context())
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, errMsg("invalid id"))
 		return
 	}
-	event, err := h.DB.GetEvent(r.Context(), id)
+	event, err := h.DB.GetEventForTenant(r.Context(), id, tenantID)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, errMsg("event not found"))
 		return
@@ -64,12 +65,13 @@ func (h *EventsHandler) get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *EventsHandler) redeliver(w http.ResponseWriter, r *http.Request) {
+	tenantID := middleware.TenantFromContext(r.Context())
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, errMsg("invalid id"))
 		return
 	}
-	if _, err := h.DB.GetEvent(r.Context(), id); err != nil {
+	if _, err := h.DB.GetEventForTenant(r.Context(), id, tenantID); err != nil {
 		writeJSON(w, http.StatusNotFound, errMsg("event not found"))
 		return
 	}

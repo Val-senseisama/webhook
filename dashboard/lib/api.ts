@@ -1,7 +1,7 @@
 import type { Delivery, DeliveryAttempt, Endpoint, Event, Subscription } from "./types";
 
 const BASE = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
-const API_KEY = process.env.WEBHOOK_API_KEY ?? process.env.NEXT_PUBLIC_API_KEY ?? "";
+const API_KEY = process.env.WEBHOOK_API_KEY ?? "";
 
 function headers(): HeadersInit {
   return {

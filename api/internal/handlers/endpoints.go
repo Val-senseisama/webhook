@@ -83,7 +83,11 @@ func (h *EndpointsHandler) create(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, errMsg("internal error"))
 		return
 	}
-	writeJSON(w, http.StatusCreated, ep)
+	// Return secret once at creation — it is not stored in plaintext and cannot be retrieved again.
+	writeJSON(w, http.StatusCreated, struct {
+		db.Endpoint
+		Secret string `json:"secret"`
+	}{ep, secret})
 }
 
 func (h *EndpointsHandler) get(w http.ResponseWriter, r *http.Request) {
@@ -173,9 +177,14 @@ func (h *EndpointsHandler) rotateSecret(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *EndpointsHandler) listSubs(w http.ResponseWriter, r *http.Request) {
+	tenantID := middleware.TenantFromContext(r.Context())
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, errMsg("invalid id"))
+		return
+	}
+	if _, err := h.DB.GetEndpoint(r.Context(), id, tenantID); err != nil {
+		writeJSON(w, http.StatusNotFound, errMsg("endpoint not found"))
 		return
 	}
 	subs, err := h.DB.ListSubscriptions(r.Context(), id)
@@ -187,9 +196,14 @@ func (h *EndpointsHandler) listSubs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *EndpointsHandler) createSub(w http.ResponseWriter, r *http.Request) {
+	tenantID := middleware.TenantFromContext(r.Context())
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, errMsg("invalid id"))
+		return
+	}
+	if _, err := h.DB.GetEndpoint(r.Context(), id, tenantID); err != nil {
+		writeJSON(w, http.StatusNotFound, errMsg("endpoint not found"))
 		return
 	}
 	var body struct {
@@ -214,10 +228,19 @@ func (h *EndpointsHandler) createSub(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *EndpointsHandler) deleteSub(w http.ResponseWriter, r *http.Request) {
-	endpointID, _ := uuid.Parse(chi.URLParam(r, "id"))
+	tenantID := middleware.TenantFromContext(r.Context())
+	endpointID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, errMsg("invalid endpoint id"))
+		return
+	}
 	subID, err := uuid.Parse(chi.URLParam(r, "subID"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, errMsg("invalid sub id"))
+		return
+	}
+	if _, err := h.DB.GetEndpoint(r.Context(), endpointID, tenantID); err != nil {
+		writeJSON(w, http.StatusNotFound, errMsg("endpoint not found"))
 		return
 	}
 	if err := h.DB.DeleteSubscription(r.Context(), subID, endpointID); err != nil {

@@ -29,11 +29,23 @@ func (d *DB) CreateEvent(ctx context.Context, p CreateEventParams) (Event, error
 	return e, err
 }
 
+// GetEvent is for internal worker use — no tenant scoping (workers already operate within a tenant context).
 func (d *DB) GetEvent(ctx context.Context, id uuid.UUID) (Event, error) {
 	var e Event
 	row := d.pool.QueryRow(ctx, `
 		SELECT id, tenant_id, source, type, payload, headers, COALESCE(idempotency_key,''), status, created_at
 		FROM events WHERE id = $1`, id)
+	err := row.Scan(&e.ID, &e.TenantID, &e.Source, &e.Type, &e.Payload, &e.Headers,
+		&e.IdempotencyKey, &e.Status, &e.CreatedAt)
+	return e, err
+}
+
+// GetEventForTenant is for API handlers — enforces tenant isolation.
+func (d *DB) GetEventForTenant(ctx context.Context, id, tenantID uuid.UUID) (Event, error) {
+	var e Event
+	row := d.pool.QueryRow(ctx, `
+		SELECT id, tenant_id, source, type, payload, headers, COALESCE(idempotency_key,''), status, created_at
+		FROM events WHERE id = $1 AND tenant_id = $2`, id, tenantID)
 	err := row.Scan(&e.ID, &e.TenantID, &e.Source, &e.Type, &e.Payload, &e.Headers,
 		&e.IdempotencyKey, &e.Status, &e.CreatedAt)
 	return e, err

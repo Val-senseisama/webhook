@@ -85,10 +85,37 @@ func main() {
 
 	database := db.New(poolerPool)
 
-	riverClient, err := river.NewClient(riverpgxv5.New(directPool), &river.Config{})
+	workerMode := os.Getenv("WORKERS") == "1"
+
+	// Build River config — workers only registered in combined mode.
+	var fanoutWorker *jobs.FanoutWorker
+	riverCfg := &river.Config{}
+	if workerMode {
+		fanoutWorker = &jobs.FanoutWorker{DB: db.New(directPool)}
+		workers := river.NewWorkers()
+		river.AddWorker(workers, fanoutWorker)
+		river.AddWorker(workers, &jobs.DeliveryWorker{
+			DB:         db.New(directPool),
+			HTTPClient: &http.Client{Timeout: 30 * time.Second},
+		})
+		riverCfg = &river.Config{
+			Workers: workers,
+			Queues: map[string]river.QueueConfig{
+				river.QueueDefault: {MaxWorkers: 5},
+				"delivery":         {MaxWorkers: 20},
+			},
+		}
+	}
+
+	riverClient, err := river.NewClient(riverpgxv5.New(directPool), riverCfg)
 	if err != nil {
 		slog.Error("create river client", "error", err)
 		os.Exit(1)
+	}
+
+	if workerMode {
+		// FanoutWorker needs the client to insert DeliveryArgs jobs; set it now that the client exists.
+		fanoutWorker.River = riverClient
 	}
 
 	defaultTenantID := uuid.MustParse(os.Getenv("DEFAULT_TENANT_ID"))
@@ -141,6 +168,14 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
+	if workerMode {
+		if err := riverClient.Start(ctx); err != nil {
+			slog.Error("start river workers", "error", err)
+			os.Exit(1)
+		}
+		slog.Info("river workers started")
+	}
+
 	go func() {
 		slog.Info("api server starting", "port", cfg.Port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -154,6 +189,12 @@ func main() {
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+
+	if workerMode {
+		if err := riverClient.Stop(shutdownCtx); err != nil {
+			slog.Error("stop river workers", "error", err)
+		}
+	}
 	srv.Shutdown(shutdownCtx)
 }
 
@@ -164,5 +205,3 @@ func runMigrations(sqlDB *sql.DB) error {
 	}
 	return goose.Up(sqlDB, ".")
 }
-
-var _ = jobs.FanoutArgs{} // keep jobs package linked

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 func (d *DB) CreateDelivery(ctx context.Context, eventID, endpointID uuid.UUID) (Delivery, error) {
@@ -21,6 +22,21 @@ func (d *DB) CreateDelivery(ctx context.Context, eventID, endpointID uuid.UUID) 
 	return del, err
 }
 
+// GetDelivery is for API handlers — enforces tenant isolation via endpoint join.
+func (d *DB) GetDelivery(ctx context.Context, id, tenantID uuid.UUID) (Delivery, error) {
+	var del Delivery
+	row := d.pool.QueryRow(ctx, `
+		SELECT d.id, d.event_id, d.endpoint_id, d.status, d.attempt_count,
+		       d.next_attempt_at, d.last_attempt_at, d.created_at
+		FROM deliveries d
+		JOIN endpoints e ON e.id = d.endpoint_id
+		WHERE d.id = $1 AND e.tenant_id = $2`, id, tenantID)
+	err := row.Scan(&del.ID, &del.EventID, &del.EndpointID, &del.Status, &del.AttemptCount,
+		&del.NextAttemptAt, &del.LastAttemptAt, &del.CreatedAt)
+	return del, err
+}
+
+// GetDeliveryDetail is for internal worker use — no tenant scoping.
 func (d *DB) GetDeliveryDetail(ctx context.Context, id uuid.UUID) (DeliveryDetail, error) {
 	var dd DeliveryDetail
 	row := d.pool.QueryRow(ctx, `
@@ -68,11 +84,18 @@ func (d *DB) MarkDeliveryDeadLettered(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
-func (d *DB) ResetDeliveryForRetry(ctx context.Context, id uuid.UUID) error {
-	_, err := d.pool.Exec(ctx,
-		`UPDATE deliveries SET status = 'pending', next_attempt_at = now(), attempt_count = 0
-		 WHERE id = $1`, id)
-	return err
+func (d *DB) ResetDeliveryForRetry(ctx context.Context, id, tenantID uuid.UUID) error {
+	tag, err := d.pool.Exec(ctx, `
+		UPDATE deliveries d SET status = 'pending', next_attempt_at = now(), attempt_count = 0
+		FROM endpoints e
+		WHERE d.id = $1 AND d.endpoint_id = e.id AND e.tenant_id = $2`, id, tenantID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
 }
 
 type ListDeliveriesParams struct {

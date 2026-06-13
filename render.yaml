@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: webhook-api
+    runtime: go
+    rootDir: api
+    buildCommand: go build -o ../bin/api ./cmd/api
+    startCommand: ../bin/api
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: WORKERS
+        value: "1"
+      - key: DATABASE_POOLER_URL
+        sync: false
+      - key: DATABASE_DIRECT_URL
+        sync: false
+      - key: DEFAULT_TENANT_ID
+        sync: false
+    healthCheckPath: /health
+    autoDeploy: true

@@ -65,23 +65,30 @@ func (h *DeliveriesHandler) list(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DeliveriesHandler) get(w http.ResponseWriter, r *http.Request) {
+	tenantID := middleware.TenantFromContext(r.Context())
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, errMsg("invalid id"))
 		return
 	}
-	dd, err := h.DB.GetDeliveryDetail(r.Context(), id)
+	del, err := h.DB.GetDelivery(r.Context(), id, tenantID)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, errMsg("delivery not found"))
 		return
 	}
-	writeJSON(w, http.StatusOK, dd)
+	writeJSON(w, http.StatusOK, del)
 }
 
 func (h *DeliveriesHandler) listAttempts(w http.ResponseWriter, r *http.Request) {
+	tenantID := middleware.TenantFromContext(r.Context())
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, errMsg("invalid id"))
+		return
+	}
+	// Verify tenant ownership before returning attempts.
+	if _, err := h.DB.GetDelivery(r.Context(), id, tenantID); err != nil {
+		writeJSON(w, http.StatusNotFound, errMsg("delivery not found"))
 		return
 	}
 	attempts, err := h.DB.ListAttempts(r.Context(), id)
@@ -93,14 +100,15 @@ func (h *DeliveriesHandler) listAttempts(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *DeliveriesHandler) retry(w http.ResponseWriter, r *http.Request) {
+	tenantID := middleware.TenantFromContext(r.Context())
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, errMsg("invalid id"))
 		return
 	}
-	if err := h.DB.ResetDeliveryForRetry(r.Context(), id); err != nil {
+	if err := h.DB.ResetDeliveryForRetry(r.Context(), id, tenantID); err != nil {
 		slog.Error("reset delivery", "delivery_id", id, "error", err)
-		writeJSON(w, http.StatusInternalServerError, errMsg("internal error"))
+		writeJSON(w, http.StatusNotFound, errMsg("delivery not found"))
 		return
 	}
 	if _, err := h.River.Insert(r.Context(), jobs.DeliveryArgs{DeliveryID: id.String()},
